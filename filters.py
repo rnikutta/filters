@@ -1,5 +1,5 @@
 import os, h5py
-import numpy as np
+import numpy as N
 from scipy import integrate
 
 """Module for handling photometry filters.
@@ -17,33 +17,22 @@ class FilterLib
     Filter() instances.
 
 
-class Filter
-  
+Ideas/TODOs:
 
-
-Ideas:
-
++ Import one filter per file, or whole directory.
 (+) Allow addition and removal of filters to the lib.
 - For additon, allow import from ASCII files, FITS files (tables?)
-+ Import one filter per file, or whole directory.
 (+) Allow export of single filters to: txt, fits.
 - Allow export of whole lib to: one HDF5 file, one FITS file, one ASCII file, set of ASCII files.
-- One internal format. Which one? HDF5?
 - write FilterLib.delete() function; uses FilterLib._delete()
-
 - Have methods to average a supplied spectrum with any filter (or multiple filters)
-
-HDF5
-
-/nacoH
-
+- Clean up / remove old code.
 
 """
 
 __author__ = 'Robert Nikutta <robert@pa.uky.edu>'
 __version__ = '2015-06-10'  # yyyy-mm-dd
 __version_first__ = '2011-02-09'
-
 
 
 #! ########### PLAYGROUND ##############
@@ -84,7 +73,7 @@ class Filter:
 
     """
 
-    def __init__(self,name,lam,phi,clam=None,normalization_input='raw',norm=1.,normalization_use='raw'):
+    def __init__(self,name,lam,phi,clam=None,normalization_input='raw',norm=1.,normalization_use='raw',lambdafactor=1.):
         """
 
         Mandatory arguments:
@@ -107,19 +96,21 @@ class Filter:
                   properly normalized function
         """
 
-# CAUTION
-        if isinstance(name,str):
-            self.name = name
-        else:
-            raise Exception, "No valid name provided for filter. Name must be a string."
-# CAUTION
+        try:
+            self.name = str(name)
+        except:
+            raise
 
         self.lam = lam
+        phi_ = phi
+
+        # scale the wavelengths by requested factor (e.g. 1.e-4 to go from micron to Angstrom)
+        # phi(lam) will be scaled opposite such that \int dlam phi(lam) = 1.
+        self.lam *= lambdafactor
+        phi_ /= lambdafactor
 
         # if provided, store clam; else calculate and store clam
-        self.clam = clam if clam else integrate.simps(self.lam*normalize(self.lam,phi),self.lam)
-        self.clam = np.array([self.clam])  # turn into length-one array; if clam was an array already, this doesn't do anything
-
+        self.clam = clam if clam else integrate.trapz(self.lam*normalize(self.lam,phi_),self.lam)
 
         # always store phi_raw, after applying normalization
         if normalization_input == 'raw':
@@ -129,7 +120,7 @@ class Filter:
         else:
             raise Exception, "Invalid value for 'normalization_input'. Chose from raw/area/peak."
 
-        self.phi_raw = phi * self.norm
+        self.phi_raw = phi_ * self.norm
 
 
         # TODO: try just calling self.set_normalization instead of the following two lines
@@ -143,7 +134,7 @@ class Filter:
         if self.normalization_use == 'raw':
             norm = 1.
         elif self.normalization_use == 'area':
-            norm = 1. / integrate.simps(self.phi_raw,self.lam)
+            norm = 1. / integrate.trapz(self.phi_raw,self.lam)
         elif self.normalization_use == 'peak':
             norm = 1. / self.phi_raw.max()
 
@@ -223,37 +214,17 @@ class Filter:
 #1
 #1        self.normalization = normalization
 #1        
-#1    # /////////////////////////////////////
 
-    # /////////////////////////////////////
+
     def __call__(self):
         """TODO: Calling the filter with some (x,y) model should apply
         the filter to the model, and return the central wavelength of
         the filter, and the flux of the model after applying the
         filter."""
         pass
-    # /////////////////////////////////////
+
 
 # ////////// end class Filter //////////
-
-
-# /////////////////////////////////////
-def flat(li):
-  """Simple function to flatten a sequence. Works recursively.
-     types=(list)        flattens lists until first non-list level
-     types=(tuple)       flattens tuples until first non-tuple level
-     types=(list,tuple)  flattens lists and tuples
-  """
-
-  newli = []
-  for l in li:
-    if isinstance(l,(list,tuple,set)):
-      newli += flat(l)
-    else:
-      newli += [l]
-
-  return newli
-# /////////////////////////////////////
 
 
 # /////////////////////////////////////
@@ -271,23 +242,24 @@ class FilterLib:
         name ignoring the case.
         """
 
+        # allowed modes of normalization
+        self.normalizations = ['raw','area','peak']
+
         # this opens an existing HDF file for read/write access;
         # creates the file if it does not exist yet
         self.file = os.path.realpath(hdffile)
-        if os.path.isfile(self.file):   # make sure it's a regular file
+        try:
             self.lib = h5py.File(self.file,'a')
-        else:
+        except:
             raise Exception, "Filter library file '%s' not found or invalid." % self.file
-    # /////////////////////////////////////
 
-    # /////////////////////////////////////
+
     def close(self):
         """Close the underlying HDF5 of the opened filter library object."""
 
         self.lib.close()
-    # /////////////////////////////////////
 
-    # /////////////////////////////////////
+
     def __call__(self,*args,**kwargs):
         """Return from or store to lib an instance of Filter() class.
 
@@ -321,16 +293,15 @@ class FilterLib:
         
         if allinstance(args,Filter):
             res = self.store(args,kwargs)   # returns None if all went fine
-        elif allinstance(args,str):
+        elif allinstance(args,str) or allinstance(args,unicode):
             normalization = kwargs.get('normalization','area')   # set default normalization to 'area', if no value was provided
             res = self.get(args,normalization)                   # returns a list of Fliter() class instances
         else:
             raise Exception, "Supplied argument(s) are neither all strings nor all instances of Filter class."
 
         return res
-    # /////////////////////////////////////
 
-    # /////////////////////////////////////
+
     def _delete(self,filtername):
         """Delete filter from the library.
 
@@ -346,9 +317,8 @@ class FilterLib:
             del self.lib[filtername]
         except KeyError:
             raise Exception, "Filter name '%s' is not present in the library." % filtername
-    # /////////////////////////////////////
 
-    # /////////////////////////////////////
+
     def _get(self,filtername,normalization='area'):
         """Return instance of class Filter() for a single filter name.
 
@@ -372,7 +342,7 @@ class FilterLib:
         """
 
         # --- fetch filter from HDF
-        clam_ = self.lib[filtername + '/clam'][:]
+        clam_ = self.lib[filtername + '/clam'].value
         lam_  = self.lib[filtername + '/lam'][:]
         phi_  = self.lib[filtername + '/phi'][:]  # this is the raw phi(lambda)
 
@@ -388,10 +358,9 @@ class FilterLib:
 
         print "clam_", clam_
         return Filter(filtername,lam_,phi_,clam=clam_,normalization_input=normalization)
-    # /////////////////////////////////////
 
-    # /////////////////////////////////////
-    def get(self,filternames,normalization='area'):
+
+    def get(self,filternames,normalization='area',sortkey='clam'):
         """Return instances of class Filter() for all requested filter names.
 
         This function is part of the public API.
@@ -404,11 +373,13 @@ class FilterLib:
         filternames : list of strings
             Names of filter names. All names must be present in the
             HDF library.
+
+        sorting : str
+            ['clam', 'name']
         """
 
-        normalizations = ['raw','area','peak']
-        if normalization not in normalizations:
-            raise Exception, "Invalid normalization '%s'. Must be on of: '%s'." % (normalization,'/'.join(normalizations))
+        if normalization not in self.normalizations:
+            raise Exception, "Invalid normalization '%s'. Must be on of: '%s'." % (normalization,'/'.join(self.normalizations))
         else:
             print "Using filter normalization '%s'." % normalization
 
@@ -429,16 +400,22 @@ class FilterLib:
         # requested, a list (of length one) will be returned. This is
         # the principle of least surprise. The return value is always
         # a list.
-        return [self._get(fname,normalization=normalization) for fname in sorted(filternames)]
-    # /////////////////////////////////////
+        filterlist = [self._get(fname,normalization=normalization) for fname in filternames]
 
-    # /////////////////////////////////////
+        if sortkey == 'name':
+            func = lambda f: f.name.lower()
+        elif sortkey == 'clam':
+            func = lambda f: f.clam
+
+        return sorted(filterlist,key=func)
+
+
     def filternames(self):
         """Return list of filter names present in the library."""
-        return sorted(self.lib.keys())
-    # /////////////////////////////////////
 
-    # /////////////////////////////////////
+        return sorted([str(f) for f in self.lib.keys()], key=lambda x: x.lower())
+
+
     def _store(self,filter):
         """Take single Filter() class instance and store its data into library.
 
@@ -472,9 +449,8 @@ class FilterLib:
         clam_ = group.create_dataset('clam',data=filter.clam)   # central wavelength of the filter
 
         return None
-    # /////////////////////////////////////
 
-    # /////////////////////////////////////
+
     def store(self,filters,overwrite=False):
         """Store data from supplied Filter() class instances into HDF library.
 
@@ -522,7 +498,6 @@ class FilterLib:
         # now store all filters in lib
         for f in filters:
             self._store(f)
-    # /////////////////////////////////////
 
 # ////////// end class FilterLib //////////
 
@@ -533,108 +508,122 @@ class FilterLib:
 # MODULE CONVENIENCE FUNCTIONS
 # /////////////////////////////////////////////////////////
 
-# /////////////////////////////////////
-def read_filters_dir(path,verbose=0):
+def load_filters_from_directory(path,suffix='.dat',lambdafactor=1.):
+
     """Read all filter files (ascii) in directory 'path'.
 
-    Return a list of instances of class Filter(), one pr filter file
-    read.
+    Turn all files into instances of Filter() class, return a list of
+    instances.
+
     """
 
-    root = os.path.normpath(path) + os.path.sep   # normalize path
-    if not os.path.isdir(root):
-        raise Exception, "Path %d is not a directory." % root
+    assert (os.path.isdir(path))
 
-    ascii_files = sorted( os.listdir(root) )
-    filters = []
+    path = os.path.normpath(path)
 
-    for i,f in enumerate(ascii_files):
-        if verbose > 0:
-            print "Working on file %d / %d : %s" % (i,len(ascii_files),f)
-            sys.stdout.flush()
+    files = os.listdir(path)
+    files = sorted([f for f in files if f.endswith(suffix)],key=lambda s: s.lower())
+    filternames = [f[:f.find(suffix)] for f in files]
 
-        filterfile = root + f
-        filters.append( read_filter_file(filterfile,skiprows=1) )
-        
-    return filters
-# /////////////////////////////////////
-    
+    filters = [] #Filter(f,clam=None
+    for j,f in enumerate(files):
+        filt = read_filter_file(path+os.path.sep+f,skiprows=1,suffix='.dat',normalization_input='raw',norm=1.,normalization_use='area',lambdafactor=lambdafactor)
+        filters.append(filt)
+#        lam, phi = N.loadtxt(path+os.path.sep+f,usecols=(0,1),skiprows=1,unpack=True)   # read in the data
+#        filters.append(Filter(filternames[j],lam,phi,clam=None,normalization_input='raw',norm=1.,normalization_use='area'))
 
-# /////////////////////////////////////
-# TODO: adjust to use new signature
-def read_filter_file(path,skiprows=1):
+    return path, filters
+
+
+def read_filter_file(filepath,skiprows=1,suffix='.dat',normalization_input='raw',norm=1.,normalization_use='area',lambdafactor=1.):
     """Read single-filter data from a text file.
 
     Description
     -----------
     The format of the text file must be 2-column (from left to right):
+
       1. Filter wavelength lambda in micron, in ascending order.
-      2. Filter function phi(lambda). This will be normalized to unit
-      area in any case.
+
+      2. Filter function phi(lambda). This will be normalized to
+      either unit area, peak value, or left as-is ('raw')
 
     Any line beginning with # will is considered a comment line, and
-    will be ignored.  The first 'skiprows' rows will not be read (this
-    assumes that the to-be-skipped-lines are not comment lines!);
-    default is skiprows=1 (conforming with the filter file formatting
-    of Andres Asensio-Ramos and Almudena Alonso-Herrero (BayesClumpy).
+    will be ignored. If not zero, the first 'skiprows' rows will not
+    be read; default is skiprows=1.
 
     The filter name will be the final part of the full path, minus the
     file suffix.
-    
+
+    The function also understands keywords that deal witht he
+    normalization of the transmission curve.
+
     Parameters
     ----------
-    path : path to file
-       Text file to be read.
+    filepath : str
+        Path to text file to be read.
+
     skiprows : int
-       Number of first (non-comment) rows to be skipped while
-       reading. Default: 0.
+       Number of first rows to be skipped while reading. Default: 0.
+
+    normalization_input, norm, normalization_use
+        For all these, please see the docstring of Filter() class.
 
     Return
     ------
     Instance of class Filter() (see docstring there).
+
     """
 
-    path = os.path.normpath(path)   # normalize path
+    path = os.path.normpath(filepath)   # normalize path
 
-    if not os.path.isfile(path):   # is path a proper file?
-        raise Exception, "Path %s is not a regular file." % path
+    if not os.path.isfile(filepath):   # is path a proper file?
+        raise Exception, "File path %s is not a regular file." % filepath
 
-    filtername = os.path.basename(path).split('.')[0]   # determine filter name
-    lam, phi = np.loadtxt(path,usecols=(0,1),skiprows=skiprows,unpack=True)   # read in the data
+    basename = os.path.basename(filepath)
+    filtername = basename[:basename.find(suffix)]
+    lam, phi = N.loadtxt(filepath,usecols=(0,1),skiprows=skiprows,unpack=True)   # read in the data
 
     # instantiate class Filter() with the read-in data
-    myfilter = Filter(lam,phi,clam=None,name=filtername)
-#    def __init__(self,name,lam,phi,clam=None,normalization_input='raw',norm=1.,normalization_use='raw'):
+    myfilter = Filter(filtername,lam,phi,clam=None,normalization_input=normalization_input,norm=norm,normalization_use=normalization_use,lambdafactor=lambdafactor)
 
     # return the instance
     return myfilter
-# /////////////////////////////////////
 
 
-# /////////////////////////////////////
+def flat(li):
+    """Simple function to flatten a sequence. Works recursively.
+       types=(list)        flattens lists until first non-list level
+       types=(tuple)       flattens tuples until first non-tuple level
+       types=(list,tuple)  flattens lists and tuples
+    """
+
+    newli = []
+    for l in li:
+      if isinstance(l,(list,tuple,set)):
+        newli += flat(l)
+      else:
+        newli += [l]
+
+    return newli
+
+
 def sequentialize(obj):
     """If object not list or tuple, return it in a list."""
 
     return obj if isinstance(obj,(list,tuple)) else [obj]
-# /////////////////////////////////////
 
 
-# /////////////////////////////////////
 def normalize(lam,phi):
+
     """Normalize phi(lam) to unit area, i.e. \int dlam phi(lam) = 1."""
-    return phi / integrate.simps(phi,lam)
-# /////////////////////////////////////
+
+    return phi / integrate.trapz(phi,lam)
 
 
-# /////////////////////////////////////
 def allinstance(seq,class_):
     """Check if all elements in sequence are instances of class_."""
 
     return True if all( [isinstance(elem,class_) for elem in seq] ) else False
-# /////////////////////////////////////
-
-
-
 
 
 
