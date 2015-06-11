@@ -8,13 +8,13 @@ file has two columns, wavelength lambda and transmission curve
 phi(lambda):
 
 ```python
-In [1]: ll /home/you/filters/
+In [1]: ll /home/user/filters/
 total 700
--rw------- 1 robert   3752 Oct 21  2014 focam_B.dat
--rw------- 1 robert   3480 Oct 21  2014 focam_V.dat
--rw------- 1 robert  37021 Oct 21  2014 HSTACSF435.dat
--rw------- 1 robert  60906 Oct 21  2014 HSTACSF606.dat
--rw------- 1 robert  49227 Oct 21  2014 HSTACSF775.dat
+-rw------- 1 user   3752 Oct 21  2014 focam_B.dat
+-rw------- 1 user   3480 Oct 21  2014 focam_V.dat
+-rw------- 1 user  37021 Oct 21  2014 HSTACSF435.dat
+-rw------- 1 user  60906 Oct 21  2014 HSTACSF606.dat
+-rw------- 1 user  49227 Oct 21  2014 HSTACSF775.dat
 ```
 
 This is how you can load all these filters into a nice library. The
@@ -22,7 +22,7 @@ backend for storage is a HDF5 file:
 
 ```python
 In [2]: import filters
-In [3]: path, filterlist = filters.load_filters_from_directory('/home/robert/science/grappa/filters/microns',suffix='.dat',lambdafactor=1e4)
+In [3]: path, filterlist = filters.load_filters_from_directory('/home/user/filters',suffix='.dat',lambdafactor=1e4)
 ```
 
 `lambdafactor`, if not unity, can be used to scale the wavelength from
