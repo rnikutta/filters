@@ -31,7 +31,7 @@ Ideas/TODOs:
 """
 
 __author__ = 'Robert Nikutta <robert@pa.uky.edu>'
-__version__ = '2015-06-10'  # yyyy-mm-dd
+__version__ = '2015-09-01'  # yyyy-mm-dd
 __version_first__ = '2011-02-09'
 
 
@@ -527,7 +527,7 @@ def load_filters_from_directory(path,suffix='.dat',lambdafactor=1.):
 
     filters = [] #Filter(f,clam=None
     for j,f in enumerate(files):
-        filt = read_filter_file(path+os.path.sep+f,skiprows=1,suffix='.dat',normalization_input='raw',norm=1.,normalization_use='area',lambdafactor=lambdafactor)
+        filt = read_filter_file(path+os.path.sep+f,skiprows=1,suffix=suffix,normalization_input='raw',norm=1.,normalization_use='area',lambdafactor=lambdafactor)
         filters.append(filt)
 #        lam, phi = N.loadtxt(path+os.path.sep+f,usecols=(0,1),skiprows=1,unpack=True)   # read in the data
 #        filters.append(Filter(filternames[j],lam,phi,clam=None,normalization_input='raw',norm=1.,normalization_use='area'))
