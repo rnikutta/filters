@@ -31,7 +31,7 @@ Ideas/TODOs:
 """
 
 __author__ = 'Robert Nikutta <robert@pa.uky.edu>'
-__version__ = '2015-09-01'  # yyyy-mm-dd
+__version__ = '2024-07-08'  # yyyy-mm-dd
 __version_first__ = '2011-02-09'
 
 
@@ -118,7 +118,7 @@ class Filter:
         elif normalization_input in ['area','peak']:
             self.norm = norm
         else:
-            raise Exception, "Invalid value for 'normalization_input'. Chose from raw/area/peak."
+            raise ValueError("Invalid value for 'normalization_input'. Chose from raw/area/peak.")
 
         self.phi_raw = phi_ * self.norm
 
@@ -251,7 +251,7 @@ class FilterLib:
         try:
             self.lib = h5py.File(self.file,'a')
         except:
-            raise Exception, "Filter library file '%s' not found or invalid." % self.file
+            raise Exception("Filter library file '%s' not found or invalid." % self.file)
 
 
     def close(self):
@@ -278,7 +278,7 @@ class FilterLib:
           lib = FilterLib(hdffile)   # hdffile is path to the library file
           lib.filternames()          # may return ['F222M','F606W','timmi2K']
           filters = lib('F222W','timmi2K')
-          for f in filters: print f, f.name
+          for f in filters: print(f,f.name)
           --> 
              <filters.Filter instance at 0x34acf38> timmi2K
              <filters.Filter instance at 0x34d2248> F222M
@@ -297,7 +297,7 @@ class FilterLib:
             normalization = kwargs.get('normalization','area')   # set default normalization to 'area', if no value was provided
             res = self.get(args,normalization)                   # returns a list of Fliter() class instances
         else:
-            raise Exception, "Supplied argument(s) are neither all strings nor all instances of Filter class."
+            raise Exception("Supplied argument(s) are neither all strings nor all instances of Filter class.")
 
         return res
 
@@ -311,12 +311,12 @@ class FilterLib:
 
         # TODO: this sanity check will go once FilterLib.delete() func defined
         if not isinstance(filtername,str):
-            raise Exception, "Supplied filter name is not a string."
+            raise Exception("Supplied filter name is not a string.")
 
         try:
             del self.lib[filtername]
         except KeyError:
-            raise Exception, "Filter name '%s' is not present in the library." % filtername
+            raise Exception("Filter name '%s' is not present in the library." % filtername)
 
 
     def _get(self,filtername,normalization='area'):
@@ -342,7 +342,7 @@ class FilterLib:
         """
 
         # --- fetch filter from HDF
-        clam_ = self.lib[filtername + '/clam'].value
+        clam_ = self.lib[filtername + '/clam'][:]
         lam_  = self.lib[filtername + '/lam'][:]
         phi_  = self.lib[filtername + '/phi'][:]  # this is the raw phi(lambda)
 
@@ -354,9 +354,9 @@ class FilterLib:
         elif normalization == 'peak':
             phi_ = phi_ / phi_.max()
         else:
-            raise Exception, "Invalid value for 'normalization'! Allowed: none/area/peak. Got: %s." % normalization
+            raise ValueError("Invalid value for 'normalization'! Allowed: none/area/peak. Got: %s." % normalization)
 
-        print "clam_", clam_
+        print("clam_",clam_)
         return Filter(filtername,lam_,phi_,clam=clam_,normalization_input=normalization)
 
 
@@ -379,22 +379,21 @@ class FilterLib:
         """
 
         if normalization not in self.normalizations:
-            raise Exception, "Invalid normalization '%s'. Must be on of: '%s'." % (normalization,'/'.join(self.normalizations))
+            raise Exception("Invalid normalization '%s'. Must be one of: '%s'." % (normalization,'/'.join(self.normalizations)))
         else:
-            print "Using filter normalization '%s'." % normalization
+            print("Using filter normalization '%s'." % normalization)
 
         # turn filternames into list, if it is not; then into a set
         filternames = set(sequentialize(filternames))
 
         # --- check if supplied filter is an instance of the Filter() class
         if not allinstance(filternames, str):
-            raise Exception, "Some supplied filternames are not strings."
+            raise Exception("Some supplied filternames are not strings.")
 
         # check if all requested filters are in the lib
         intersection = set.intersection(filternames,set(self.filternames()))
         if sorted(intersection) != sorted(filternames):
-            raise Exception, "Not all requested filters are present in the library. Availables filters are: %s" %\
-                  ','.join(self.filternames())
+            raise Exception("Not all requested filters are present in the library. Availables filters are: %s" % ','.join(self.filternames()))
 
         # Return list of filters; even if only one filter names was
         # requested, a list (of length one) will be returned. This is
@@ -480,20 +479,20 @@ class FilterLib:
         
         # ensure that no two supplied filters have the same name
         if len(filters) != len(filternames):
-            raise Exception, "Some supplied filters have identical names."
+            raise Exception("Some supplied filters have identical names.")
 
         # check if all elements are instances of Filter class
         if not allinstance(filters,Filter):
-            raise Exception, "Some elements in list are not instances of Filter class."
+            raise Exception("Some elements in list are not instances of Filter class.")
 
         # any filter names already in library?
         intersection = set.intersection(filternames,set(self.filternames()))
         if intersection:   # if yes...
             msg = "Filter(s) '%s' is/are already present in the library. " % ",".join(intersection)
             if not overwrite:
-                raise Exception, msg + "You can overwrite via overwrite=True."
+                raise Exception(msg + "You can overwrite via overwrite=True.")
             else:
-                print msg + "Will be overwritten."
+                print(msg + "Will be overwritten.")
 
         # now store all filters in lib
         for f in filters:
@@ -577,7 +576,7 @@ def read_filter_file(filepath,skiprows=1,suffix='.dat',normalization_input='raw'
     path = os.path.normpath(filepath)   # normalize path
 
     if not os.path.isfile(filepath):   # is path a proper file?
-        raise Exception, "File path %s is not a regular file." % filepath
+        raise Exception("File path %s is not a regular file." % filepath)
 
     basename = os.path.basename(filepath)
     filtername = basename[:basename.find(suffix)]
