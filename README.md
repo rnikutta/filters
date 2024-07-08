@@ -75,13 +75,13 @@ Out[8]:
 Plot the filters:
 
 ```python
-In [9]: import pylab as p
+In [9]: import pylab as plt
 In [10]: for filt in selected_filters:
-    p.plot(filt.lam,filt,phi,ls='-',label=filt.name)
-    p.axvline(filt.clam)
-In [11]: p.legend()
-In [12]: p.xlabel(r'$\lambda$ (Angstrom)')
-In [13]: p.ylabel(r'$\phi(\lambda)$')
+    plt.plot(filt.lam,filt.phi,ls='-',label=filt.name)
+    plt.axvline(filt.clam)
+In [11]: plt.legend()
+In [12]: plt.xlabel(r'$\lambda$ (Angstrom)')
+In [13]: plt.ylabel(r'$\phi(\lambda)$')
 ```
 
 ![filters.png](./filters.png)
@@ -91,7 +91,7 @@ Confirm normalization:
 ```python
 In [10]: from scipy import integrate
 In [14]: for filt in selected_filters:
-    print filt.name, integrate.trapz(filt.phi,filt.lam)
+    print(filt.name, integrate.trapz(filt.phi,filt.lam))
 focam_B 1.0
 HSTACSF775 1.0
 ```
